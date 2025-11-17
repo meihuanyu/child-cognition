@@ -54,6 +54,22 @@ pnpm install
 
 ---
 
+## 🛠 yt-dlp 二进制管理
+
+YouTube 处理依赖 `yt-dlp`，相关逻辑位于 `lib/youtube.ts`：
+
+- 默认存放目录：`bin/`
+- 文件命名规则：`yt-dlp-${process.platform}`，例如：
+  - macOS：`bin/yt-dlp-darwin`
+  - Linux：`bin/yt-dlp-linux`
+  - Windows：`bin/yt-dlp-win32.exe`（同时兼容旧的 `bin/yt-dlp.exe`）
+- 首次触发时会自动下载对应平台的二进制文件。
+- 在 macOS / Linux 中手动放置文件后，记得执行 `chmod +x bin/yt-dlp-*` 以确保可执行。
+
+如果需要离线部署，可提前下载二进制放到上述路径，系统会自动复用。
+
+---
+
 ## 🗄️ 数据库迁移
 
 由于添加了 `audioUrl` 字段，需要更新数据库：

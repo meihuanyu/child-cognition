@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Loader2, BookOpen, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { CheckedState } from '@radix-ui/react-checkbox';
+import { ArrowLeft, Plus, Loader2, BookOpen, Clock, Trash2 } from 'lucide-react';
 
 interface Lesson {
   id: string;
@@ -20,6 +22,8 @@ interface Lesson {
 export default function LessonsPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLessons, setSelectedLessons] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // MVP: 使用固定的用户 ID
   const DEMO_USER_ID = 'demo-user-001';
@@ -41,6 +45,73 @@ export default function LessonsPage() {
 
     fetchLessons();
   }, []);
+
+  useEffect(() => {
+    setSelectedLessons((prev) => {
+      const next = new Set<string>();
+      lessons.forEach((lesson) => {
+        if (prev.has(lesson.id)) {
+          next.add(lesson.id);
+        }
+      });
+      return next;
+    });
+  }, [lessons]);
+
+  const handleToggleLessonSelection = (lessonId: string, checked: CheckedState) => {
+    const isChecked = checked === true;
+    setSelectedLessons((prev) => {
+      const next = new Set(prev);
+      if (isChecked) {
+        next.add(lessonId);
+      } else {
+        next.delete(lessonId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = (checked: CheckedState) => {
+    const isChecked = checked === true;
+    if (isChecked) {
+      setSelectedLessons(new Set(lessons.map((lesson) => lesson.id)));
+    } else {
+      setSelectedLessons(new Set());
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLessons.size === 0) return;
+
+    const confirmed = window.confirm(`确认删除选中的 ${selectedLessons.size} 个课程？此操作不可撤销。`);
+    if (!confirmed) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await fetch('/api/lessons/batch-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: DEMO_USER_ID,
+          lessonIds: Array.from(selectedLessons),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('批量删除失败');
+      }
+
+      setLessons((prev) => prev.filter((lesson) => !selectedLessons.has(lesson.id)));
+      setSelectedLessons(new Set());
+    } catch (error) {
+      console.error('批量删除失败:', error);
+      alert('批量删除失败，请稍后再试。');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const badges = {
@@ -108,40 +179,98 @@ export default function LessonsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {lessons.map((lesson) => (
-              <Card key={lesson.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg line-clamp-2">
-                      {lesson.title}
-                    </CardTitle>
-                    {getStatusBadge(lesson.status)}
-                  </div>
-                  <CardDescription className="line-clamp-1">
-                    {lesson.sourceUrl}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <BookOpen className="w-4 h-4 mr-2" />
-                      {lesson._count.segments} 个句子
+          <>
+            <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={
+                      lessons.length > 0 && selectedLessons.size === lessons.length
+                        ? true
+                        : selectedLessons.size > 0
+                        ? 'indeterminate'
+                        : false
+                    }
+                    onCheckedChange={handleToggleSelectAll}
+                    aria-label="全选课程"
+                  />
+                  <span className="text-sm text-gray-700">全选</span>
+                </div>
+                <span className="text-sm text-gray-500">
+                  已选 {selectedLessons.size} 个课程
+                </span>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleBulkDelete}
+                disabled={selectedLessons.size === 0 || isBulkDeleting}
+                className="w-full md:w-auto"
+              >
+                {isBulkDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    删除中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    批量删除
+                  </>
+                )}
+              </Button>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {lessons.map((lesson) => {
+                const isSelected = selectedLessons.has(lesson.id);
+                return (
+                  <Card
+                    key={lesson.id}
+                    className={`relative hover:shadow-lg transition-shadow ${
+                      isSelected ? 'ring-2 ring-blue-500' : ''
+                    }`}
+                  >
+                    <div className="absolute top-4 right-4 z-10">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked: CheckedState) =>
+                          handleToggleLessonSelection(lesson.id, checked)
+                        }
+                        aria-label={`选择课程 ${lesson.title}`}
+                      />
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="w-4 h-4 mr-2" />
-                      {new Date(lesson.createdAt).toLocaleDateString('zh-CN')}
-                    </div>
-                    <Link href={`/lesson/${lesson.id}`}>
-                      <Button className="w-full" disabled={lesson.status !== 'DONE'}>
-                        {lesson.status === 'DONE' ? '开始学习' : '处理中...'}
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <CardHeader>
+                      <div className="flex items-start justify-between mb-2 pr-8">
+                        <CardTitle className="text-lg line-clamp-2">
+                          {lesson.title}
+                        </CardTitle>
+                        {getStatusBadge(lesson.status)}
+                      </div>
+                      <CardDescription className="line-clamp-1">
+                        {lesson.sourceUrl}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          {lesson._count.segments} 个句子
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Clock className="w-4 h-4 mr-2" />
+                          {new Date(lesson.createdAt).toLocaleDateString('zh-CN')}
+                        </div>
+                        <Link href={`/lesson/${lesson.id}`}>
+                          <Button className="w-full" disabled={lesson.status !== 'DONE'}>
+                            {lesson.status === 'DONE' ? '开始学习' : '处理中...'}
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

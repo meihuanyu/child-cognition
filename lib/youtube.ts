@@ -6,34 +6,72 @@ import webvtt from 'node-webvtt';
 import { cleanupTempFile } from './s3';
 import { type SubtitleSegment } from './segmentation';
 
-// yt-dlp 二进制文件路径
-const ytDlpPath = path.join(process.cwd(), 'bin', 'yt-dlp.exe');
+const binDir = path.join(process.cwd(), 'bin');
 let ytDlp: YTDlpWrap;
+
+function ensureExecutable(filePath: string) {
+  if (process.platform === 'win32') return;
+
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.chmodSync(filePath, 0o755);
+    }
+  } catch (error) {
+    console.warn('设置 yt-dlp 可执行权限失败:', error);
+  }
+}
+
+function resolveYtDlpPath() {
+  const platform = process.platform;
+  const platformBinary = path.join(
+    binDir,
+    `yt-dlp-${platform}${platform === 'win32' ? '.exe' : ''}`,
+  );
+  const fallbackPaths =
+    platform === 'win32'
+      ? [path.join(binDir, 'yt-dlp.exe')]
+      : [path.join(binDir, 'yt-dlp')];
+
+  const existingPath = [platformBinary, ...fallbackPaths].find(candidate =>
+    fs.existsSync(candidate),
+  );
+
+  const binaryPath = existingPath ?? platformBinary;
+  const exists = Boolean(existingPath);
+
+  if (exists) {
+    ensureExecutable(binaryPath);
+  }
+
+  return { binaryPath, targetPath: platformBinary, exists };
+}
 
 /**
  * 初始化 yt-dlp（如果需要则下载）
  */
-async function initYtDlp() {
+export async function initYtDlp() {
   if (ytDlp) return ytDlp;
 
   try {
+    const { binaryPath, targetPath, exists } = resolveYtDlpPath();
+
     // 检查是否已存在 yt-dlp 二进制文件
-    if (fs.existsSync(ytDlpPath)) {
-      ytDlp = new YTDlpWrap(ytDlpPath);
+    if (exists) {
+      ytDlp = new YTDlpWrap(binaryPath);
       return ytDlp;
     }
 
     // 如果不存在，则下载
     console.log('正在下载 yt-dlp...');
-    const binDir = path.dirname(ytDlpPath);
     if (!fs.existsSync(binDir)) {
       fs.mkdirSync(binDir, { recursive: true });
     }
 
-    await YTDlpWrap.downloadFromGithub(ytDlpPath);
+    await YTDlpWrap.downloadFromGithub(targetPath, undefined, process.platform);
+    ensureExecutable(targetPath);
     console.log('yt-dlp 下载完成');
 
-    ytDlp = new YTDlpWrap(ytDlpPath);
+    ytDlp = new YTDlpWrap(targetPath);
     return ytDlp;
   } catch (error) {
     console.error('初始化 yt-dlp 失败:', error);

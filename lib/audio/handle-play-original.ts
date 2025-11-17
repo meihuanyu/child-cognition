@@ -9,7 +9,6 @@ export interface HandlePlayOriginalOptions {
   segment: SegmentBounds | null | undefined;
   proxiedAudioUrl: string | null;
   audioElement: HTMLAudioElement | null;
-  fallbackToTTS: () => Promise<void> | void;
 }
 
 function isValidBounds(segment: SegmentBounds | null | undefined): segment is Required<SegmentBounds> {
@@ -25,28 +24,23 @@ export async function handlePlayOriginal({
   segment,
   proxiedAudioUrl,
   audioElement,
-  fallbackToTTS,
 }: HandlePlayOriginalOptions) {
   if (!isValidBounds(segment)) {
-    await fallbackToTTS();
+    console.warn('缺少有效的片段时间范围，无法播放原音频');
     return;
   }
 
   if (!audioElement || !proxiedAudioUrl) {
-    await fallbackToTTS();
+    console.warn('缺少音频元素或音频地址，无法播放原音频');
     return;
   }
 
-  const played = await playOriginalSegment({
+  await playOriginalSegment({
     proxiedAudioUrl,
     segmentStart: segment.startTime,
     segmentEnd: segment.endTime,
     audioElement,
   });
-
-  if (!played) {
-    await fallbackToTTS();
-  }
 }
 
 

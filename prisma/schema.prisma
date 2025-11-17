@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  createdAt         DateTime @default(now())
+  
+  // 订阅状态 - 对应商业模式
+  subscriptionStatus String   @default("FREE") // e.g., "FREE", "MONTHLY", "YEARLY"
+  stripeCustomerId  String?  @unique // 为支付集成(Stripe, Lemon Squeezy)预留
+
+  // 关系
+  lessons     Lesson[]    // 用户创建/收藏的课程
+  studyLogs   StudyLog[]  // 学习记录
+  reports     Report[]    // 发布的报告
+}
+
+// 课程/内容模型 - 核心价值 2
+// (基于 YouTube 或其他来源的单一学习材料)
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String   // "小猪佩奇学中文第1集"
+  sourceUrl   String   // "https://www.youtube.com/watch?v=..."
+  
+  // 内容生成状态 (功能 A)
+  status      String   @default("PENDING") // "PENDING", "PROCESSING", "DONE", "ERROR"
+  
+  // 课程内容 - 加工后的数据
+  // 我们使用一个单独的表 'Segment' 来存储分段内容,以提高性能
+  
+  userId      String   // 创建者/所有者
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  // 关系
+  segments    Segment[]
+}
+
+// 课时分段模型 - 核心价值 1
+// (课程的每一句话或每一段)
+model Segment {
+  id          String   @id @default(cuid())
+  lessonId    String   // 关联的课程
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  order       Int      // 在课程中的顺序
+  
+  originalText  String   // 原始文本 (e.g., "你好")
+  
+  // 加工数据 (功能 A)
+  pinyinText    String?  // "nǐ hǎo" (中文模式)
+  englishMeaning String?  // "Hello" (英文模式的简易词义)
+  
+  // 原文音频 - 可以存储 S3/R2 链接,或直接用 TTS API
+  // 为简单起见,MVP 阶段我们不存储音频,而是实时使用 window.speechSynthesis
+  
+  // 关系
+  studyLogs   StudyLog[]
+  
+  @@unique([lessonId, order])
+}
+
+// 学习日志模型 - 核心价值 3
+// (孩子的每一次跟读尝试)
+model StudyLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  segmentId   String
+  segment     Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  
+  timestamp   DateTime @default(now())
+  
+  // PRD 要求的三档反馈 (功能 B)
+  rating      String   // "GOOD", "OK", "RETRY"
+  
+  // (可选) 存储孩子的识别结果
+  userTranscript String?
+}
+
+// 报告模型 (功能 D)
+model Report {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  startDate   DateTime
+  endDate     DateTime
+  
+  // 报告内容 (MVP 纯文本)
+  // "总阅读字数: 200, 最常读: '小猪佩奇', 进步趋势: 良好..."
+  content     String   
+  
+  createdAt   DateTime @default(now())
+}
+

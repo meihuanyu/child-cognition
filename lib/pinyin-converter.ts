@@ -1,4 +1,17 @@
-import pinyin from 'pinyin';
+import { pinyin } from 'pinyin-pro';
+
+/**
+ * pinyin-pro 的 type: 'all' 返回的数据结构
+ */
+interface PinyinData {
+  origin: string;     // 原始字符
+  pinyin: string;     // 拼音
+  first?: string;     // 声母
+  final?: string;     // 韵母
+  num?: number;       // 音调数字
+  isZh?: boolean;     // 是否是中文
+  polyphonic?: string[];  // 多音字
+}
 
 /**
  * 将中文文本转换为拼音
@@ -7,16 +20,21 @@ import pinyin from 'pinyin';
  */
 export function convertToPinyin(text: string): string {
   try {
-    // pinyin 库配置：
-    // style: pinyin.STYLE_TONE - 带声调的拼音
-    // heteronym: false - 不显示多音字
+    // pinyin-pro 配置：
+    // toneType: 'symbol' - 使用音调符号（如 ā, á, ǎ, à）
+    // type: 'all' - 返回详细的拼音数据
     const result = pinyin(text, {
-      style: pinyin.STYLE_TONE,
-      heteronym: false,
-    });
+      toneType: 'symbol',
+      type: 'all',
+    }) as PinyinData[];
     
-    // 将二维数组转换为字符串，用空格分隔
-    return result.map(item => item[0]).join(' ');
+    // 将 PinyinData[] 转换为字符串
+    // 提取每个字符的 pinyin 字段并用空格连接
+    const pinyinString = result
+      .map(item => item.pinyin || item.origin)
+      .join(' ');
+    
+    return pinyinString;
   } catch (error) {
     console.error('拼音转换失败:', error);
     return text; // 转换失败时返回原文

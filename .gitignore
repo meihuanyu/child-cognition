@@ -39,3 +39,9 @@ next-env.d.ts
 /db/dev.db
 /db/dev.db-journal
 
+# yt-dlp binary
+/bin
+
+# temporary files
+/temp
+

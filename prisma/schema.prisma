@@ -37,6 +37,12 @@ model Lesson {
   // 内容生成状态 (功能 A)
   status      String   @default("PENDING") // "PENDING", "PROCESSING", "DONE", "ERROR"
   
+  // 源语言 (从 VTT 解析)
+  language    String?  // "en" 或 "zh"
+  
+  // 完整音频 URL (S3)
+  audioUrl    String?
+
   // 课程内容 - 加工后的数据
   // 我们使用一个单独的表 'Segment' 来存储分段内容,以提高性能
   
@@ -58,14 +64,15 @@ model Segment {
   
   order       Int      // 在课程中的顺序
   
-  originalText  String   // 原始文本 (e.g., "你好")
+  originalText  String   // 原始文本 (英文或中文)
+  
+  // 时间戳信息 (从 VTT 解析，单位：秒)
+  startTime     Float?   // 开始时间
+  endTime       Float?   // 结束时间
   
   // 加工数据 (功能 A)
-  pinyinText    String?  // "nǐ hǎo" (中文模式)
-  englishMeaning String?  // "Hello" (英文模式的简易词义)
-  
-  // 原文音频 - 可以存储 S3/R2 链接,或直接用 TTS API
-  // 为简单起见,MVP 阶段我们不存储音频,而是实时使用 window.speechSynthesis
+  translatedText String?  // 英文→中文翻译 (仅英文片源)
+  pinyinText    String?  // 拼音 (对中文或翻译后的中文生成)
   
   // 关系
   studyLogs   StudyLog[]

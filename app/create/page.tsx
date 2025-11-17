@@ -12,7 +12,7 @@ import { Loader2, ArrowLeft, Youtube } from 'lucide-react';
 
 export default function CreateLessonPage() {
   const router = useRouter();
-  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('https://www.youtube.com/watch?v=mRj1RKh4xyY');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 

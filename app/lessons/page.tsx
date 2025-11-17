@@ -46,6 +46,10 @@ export default function LessonsPage() {
     const badges = {
       PENDING: { text: '等待中', color: 'bg-yellow-100 text-yellow-800' },
       PROCESSING: { text: '处理中', color: 'bg-blue-100 text-blue-800' },
+      READY_FOR_SEGMENT: { text: '待分段', color: 'bg-amber-100 text-amber-800' },
+      SEGMENTING: { text: '分段中', color: 'bg-blue-100 text-blue-800' },
+      READY_FOR_TRANSLATION: { text: '待翻译', color: 'bg-purple-100 text-purple-800' },
+      TRANSLATING: { text: '翻译中', color: 'bg-indigo-100 text-indigo-800' },
       DONE: { text: '已完成', color: 'bg-green-100 text-green-800' },
       ERROR: { text: '失败', color: 'bg-red-100 text-red-800' },
     };

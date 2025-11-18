@@ -359,8 +359,8 @@ export default function LessonPage() {
       </header>
 
       {/* Main Content */}
-        <div className="container mx-auto px-4 pt-8 pb-32 max-w-4xl space-y-8">
-        { currentStatus.tone !== 'success' && <div className="space-y-3">
+      <div className="container mx-auto px-4 pt-8 pb-32 max-w-4xl space-y-8">
+        {currentStatus.tone !== 'success' && <div className="space-y-3">
           {infoMessage && (
             <Alert>
               <AlertDescription>{infoMessage}</AlertDescription>
@@ -379,7 +379,7 @@ export default function LessonPage() {
             </AlertDescription>
           </Alert>
         </div>}
-        
+
 
         {/* 语言标识 */}
         <div className="mb-8 text-center">
@@ -389,66 +389,56 @@ export default function LessonPage() {
         </div>
         <Card>
           <CardContent className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-2xl font-semibold text-gray-900">{currentStatus.label}</p>
-            </div>
-      <audio
-        ref={audioRef}
-        src={proxiedAudioUrl ?? undefined}
-        preload="auto"
-        controls
-        className="w-full mt-6 rounded-lg border border-gray-200"
-      />
-      
+            <audio
+              ref={audioRef}
+              src={proxiedAudioUrl ?? undefined}
+              preload="auto"
+              controls
+              className="w-full mt-6 rounded-lg border border-gray-200"
+            />
+
           </CardContent>
         </Card>
         {/* 所有句子列表 */}
         {hasSegments ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl font-semibold">课程内容</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {lesson.segments.map((segment, index) => (
-                  <button
-                    key={segment.id}
-                    onClick={() => setActiveSegmentIndex(index)}
-                    className={`w-full text-left p-4 md:p-5 rounded-xl transition-all border ${
-                      segmentPracticeResults[segment.id] === 'RETRY'
-                        ? 'border-red-400 bg-red-50'
-                        : index === activeSegmentIndex
-                        ? 'border-blue-400 bg-blue-50 shadow-sm'
-                        : 'border-transparent bg-gray-50 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="text-base font-semibold text-gray-500 min-w-[2.5rem]">
-                        {index + 1}.
-                      </span>
-                      <div className="flex-1">
-                        {lesson.language === 'en' ? (
-                          <>
-                            <p className="text-lg font-semibold text-gray-900 leading-relaxed">
-                              {segment.originalText}
-                            </p>
-                            <p className="text-sm text-blue-600 mt-2">
-                              {segment.translatedText || '尚未生成中文翻译'}
-                            </p>
-                          </>
-                        ) : (
-                          <ChineseSegment
-                            originalText={segment.originalText}
-                            pinyinText={segment.pinyinText}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            {lesson.segments.map((segment, index) => (
+              <button
+                key={segment.id}
+                onClick={() => setActiveSegmentIndex(index)}
+                className={`w-full text-left p-4 md:p-5 rounded-xl transition-all border ${segmentPracticeResults[segment.id] === 'RETRY'
+                    ? 'border-red-400 bg-red-50'
+                    : index === activeSegmentIndex
+                      ? 'border-blue-400 bg-blue-50 shadow-sm'
+                      : 'border-transparent bg-gray-50 hover:bg-gray-100'
+                  }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-base font-semibold text-gray-500 min-w-[2.5rem]">
+                    {index + 1}.
+                  </span>
+                  <div className="flex-1">
+                    {lesson.language === 'en' ? (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900 leading-relaxed">
+                          {segment.originalText}
+                        </p>
+                        <p className="text-sm text-blue-600 mt-2">
+                          {segment.translatedText || '尚未生成中文翻译'}
+                        </p>
+                      </>
+                    ) : (
+                      <ChineseSegment
+                        originalText={segment.originalText}
+                        pinyinText={segment.pinyinText}
+                        isSelected={index === activeSegmentIndex}
+                      />
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         ) : (
           <Card>
             <CardHeader>
@@ -508,7 +498,7 @@ export default function LessonPage() {
             </Button>
           )}
 
-<Button
+          <Button
             size="lg"
             variant="outline"
             onClick={handlePlayOriginal}
@@ -536,7 +526,7 @@ export default function LessonPage() {
               </>
             )}
           </Button>
-          
+
         </div>
       </div>
 

@@ -1,6 +1,10 @@
 /**
  * 字幕片段接口
  */
+const CHINESE_END_PUNCTUATION = /[。！？]$/;
+// 常见句末语气词（字幕缺少标点时用于辅助断句）
+const CHINESE_MODAL_PARTICLE_END = /[吗呢吧呀啊啦嘛哇耶噢喔哈]/;
+
 export interface SubtitleSegment {
   text: string;
   startTime: number;  // 秒
@@ -17,7 +21,17 @@ function isCompleteSentence(text: string, language: string): boolean {
   // 根据语言判断句子结束标志
   if (language === 'zh' || language === 'zh-cn' || language === 'zh-tw') {
     // 中文：以。！？结尾表示完整句子
-    return /[。！？]$/.test(trimmed);
+    if (CHINESE_END_PUNCTUATION.test(trimmed)) {
+      return true;
+    }
+
+    // 若无标点但以语气词（吗、呢、吧、呀等）结尾，也视为一句
+    const lastChar = trimmed.charAt(trimmed.length - 1);
+    if (CHINESE_MODAL_PARTICLE_END.test(lastChar)) {
+      return true;
+    }
+
+    return false;
   } else {
     // 英文：以. ! ?结尾表示完整句子
     // 但要排除缩写（如 Mr., Dr. 等）

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { pinyin } from 'pinyin-pro';
+import { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface ChineseSegmentProps {
   originalText: string;
   pinyinText?: string | null;
+  isSelected?: boolean;
 }
 
 interface WordSegment {
@@ -13,117 +14,121 @@ interface WordSegment {
   pinyin: string;
 }
 
-export function ChineseSegment({ originalText, pinyinText }: ChineseSegmentProps) {
+export function ChineseSegment({ originalText, pinyinText, isSelected = false }: ChineseSegmentProps) {
   const [segments, setSegments] = useState<WordSegment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSegment = useCallback(async () => {
+    if (!originalText) {
+      setSegments([]);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // 调用后端API进行分词
+      const response = await fetch('/api/segment-chinese', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: originalText }),
+      });
+
+      if (!response.ok) {
+        throw new Error('分词请求失败');
+      }
+
+      const data = await response.json();
+      if (data.success && data.segments) {
+        setSegments(data.segments);
+      } else {
+        throw new Error(data.error || '分词失败');
+      }
+    } catch (error) {
+      console.error('分词失败:', error);
+      // 如果分词失败，至少显示原文
+      setSegments([{ word: originalText, pinyin: pinyinText || '' }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [originalText, pinyinText]);
 
   useEffect(() => {
-    const segmentText = async () => {
-      if (!originalText) {
-        setSegments([]);
-        setIsLoading(false);
-        return;
-      }
+    if (!isSelected || !originalText) {
+      return;
+    }
 
-      try {
-        // 动态导入jieba-js以避免SSR问题
-        const jiebaModule = await import('jieba-js');
-        const jieba = jiebaModule.default || jiebaModule;
-        
-        // 使用jieba-js进行分词
-        const words = await jieba.cut(originalText);
-        
-        // 处理分词结果：保留中文词和标点符号，但分别处理
-        const wordSegments: WordSegment[] = [];
-        
-        for (const word of words) {
-          const trimmedWord = word.trim();
-          if (trimmedWord.length === 0) continue;
-          
-          // 检查是否包含中文字符
-          if (/[\u4e00-\u9fa5]/.test(trimmedWord)) {
-            // 包含中文，生成拼音
-            const wordPinyin = pinyin(trimmedWord, {
-              toneType: 'symbol',
-              type: 'all',
-            }) as Array<{ pinyin: string; origin: string }>;
-            
-            // 将每个字符的拼音连接起来，用空格分隔
-            const pinyinStr = wordPinyin
-              .map((item) => item.pinyin || item.origin)
-              .join(' ');
-
-            wordSegments.push({
-              word: trimmedWord,
-              pinyin: pinyinStr,
-            });
-          } else {
-            // 纯标点符号或空格，也显示但不生成拼音
-            wordSegments.push({
-              word: trimmedWord,
-              pinyin: '',
-            });
-          }
-        }
-
-        setSegments(wordSegments);
-      } catch (error) {
-        console.error('分词失败:', error);
-        // 如果分词失败，至少显示原文
-        setSegments([{ word: originalText, pinyin: pinyinText || '' }]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    segmentText();
-  }, [originalText, pinyinText]);
+    if (segments.length === 0 && !isLoading) {
+      handleSegment();
+    }
+  }, [handleSegment, isLoading, isSelected, originalText, segments.length]);
 
   if (isLoading) {
     return (
-      <div className="text-base text-gray-600">
-        {originalText}
+      <div className="space-y-2">
+        <div className="text-base text-gray-600">
+          {originalText}
+        </div>
+        <div className="text-sm text-gray-500">分词中...</div>
       </div>
     );
   }
 
   if (segments.length === 0) {
     return (
-      <div className="text-base text-gray-600">
-        {originalText}
+      <div className="space-y-2">
+        <div className="text-base text-gray-600">
+          {originalText}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-2 leading-relaxed">
-      {segments.map((segment, index) => {
-        // 如果是标点符号或没有拼音的词，只显示文字
-        if (!segment.pinyin || segment.pinyin.trim().length === 0) {
+    <div className="space-y-2">
+      {/* 1. 移除了 gap-x-3，改为手动控制间距以实现更自然的标点跟随 */}
+      <div className="flex flex-wrap items-end gap-y-2 leading-relaxed">
+        {segments.map((segment, index) => {
+          const isPunctuation = !segment.pinyin || segment.pinyin.trim().length === 0;
+
+          // 预判下一个片段是否为标点
+          const nextSegment = segments[index + 1];
+          const isNextPunctuation = nextSegment && (!nextSegment.pinyin || nextSegment.pinyin.trim().length === 0);
+
+          // 动态计算 margin-right
+          // 如果当前不是标点，但下一个是标点，则 margin 极小(mr-0.5)或为0，让标点紧贴前文
+          // 否则，给予正常的阅读间距(mr-3)
+          const marginClass = (!isPunctuation && isNextPunctuation) ? "mr-0.5" : "mr-3";
+
+          // 标点符号渲染
+          if (isPunctuation) {
+            return (
+              <span
+                key={index}
+                className={`text-base font-semibold text-gray-900 ${marginClass}`}
+              >
+                {segment.word}
+              </span>
+            );
+          }
+
+          // 拼音文字渲染
           return (
-            <span key={index} className="text-base font-semibold text-gray-900">
-              {segment.word}
+            <span
+              key={index}
+              className={`inline-flex flex-col items-center text-center text-base font-semibold text-gray-900 ${marginClass}`}
+            >
+              <ruby className="flex flex-col items-center leading-tight">
+                <rt className="text-xs font-normal text-gray-500 tracking-wide mt-0.5">
+                  {segment.pinyin}
+                </rt>
+                {segment.word}
+              </ruby>
             </span>
           );
-        }
-        
-        // 有拼音的词，显示拼音在上，中文在下
-        return (
-          <div
-            key={index}
-            className="inline-flex flex-col items-center"
-          >
-            {/* 拼音在上 */}
-            <span className="text-xs text-gray-500 leading-tight mb-0.5">
-              {segment.pinyin}
-            </span>
-            {/* 中文在下 */}
-            <span className="text-base font-semibold text-gray-900 leading-tight">
-              {segment.word}
-            </span>
-          </div>
-        );
-      })}
+        })}
+      </div>
     </div>
   );
 }

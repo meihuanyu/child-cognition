@@ -30,7 +30,7 @@ jobs:
       - name: Copy necessary files
         run: |
           mkdir -p release
-          cp -r .next public prisma package.json next.config.ts .npmrc  release/
+          cp -r .next prisma package.json next.config.js  release/
           cd release
           zip -r ../release.zip .
           

@@ -52,7 +52,6 @@ async function main() {
         order: i,
         originalText: segments[i].text,
         pinyinText: segments[i].pinyin,
-        englishMeaning: segments[i].english,
       },
     });
   }

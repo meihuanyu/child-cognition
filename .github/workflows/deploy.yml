@@ -1,0 +1,73 @@
+name: Build and Upload Release
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Build release file
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm prisma generate
+          pnpm build
+
+      - name: Copy necessary files
+        run: |
+          mkdir -p release
+          cp -r .next public prisma package.json next.config.ts .npmrc  release/
+          cd release
+          zip -r ../release.zip .
+          
+      - name: Deploy via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALI_SSH_HOST }}
+          username: root
+          password: ${{ secrets.ALI_SSH_PASSWORD }}
+          source: "release.zip"
+          target: "/var/www/cognition"
+
+      - name: SSH into server and deploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.ALI_SSH_HOST }}
+          username: root
+          password: ${{ secrets.ALI_SSH_PASSWORD }}
+          script: |
+            cd /var/www/cognition
+            unzip -o release.zip
+            rm release.zip
+
+            # 停止应用
+            pm2 delete cognition || true
+            
+            # 安装依赖
+            pnpm i
+            npx prisma generate
+            
+            # 执行数据库迁移（安全模式下）
+            npx prisma migrate deploy
+            
+            # 启动应用，使用7688端口
+            pm2 start npm --name cognition -- start
+            pm2 save
+            
+            # 检查应用状态
+            sleep 5
+            pm2 status cognition

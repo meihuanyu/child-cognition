@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, Volume2, Mic, Play, RefreshCcw } from 'lucide-react
 import { startSpeechRecognition, checkSpeechSupport } from '@/lib/speech';
 import { evaluateTranscript, getFeedbackMessage } from '@/lib/evaluate';
 import { handlePlayOriginal as handleOriginalPlayback } from '@/lib/audio/handle-play-original';
+import { ChineseSegment } from '@/components/chinese-segment';
 
 interface Segment {
   id: string;
@@ -436,14 +437,10 @@ export default function LessonPage() {
                             </p>
                           </>
                         ) : (
-                          <>
-                            <p className="text-lg font-semibold text-gray-900 leading-relaxed">
-                              {segment.originalText}
-                            </p>
-                            <p className="text-base text-gray-600 mt-2">
-                              {segment.pinyinText || '尚未生成拼音'}
-                            </p>
-                          </>
+                          <ChineseSegment
+                            originalText={segment.originalText}
+                            pinyinText={segment.pinyinText}
+                          />
                         )}
                       </div>
                     </div>

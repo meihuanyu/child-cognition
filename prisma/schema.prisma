@@ -97,6 +97,12 @@ model StudyLog {
   
   // (可选) 存储孩子的识别结果
   userTranscript String?
+
+  // 音频存储在 S3，只在此记录 URL 与时长（毫秒）
+  audioUrl    String?
+  durationMs  Int?
+
+  @@unique([userId, segmentId])
 }
 
 // 报告模型 (功能 D)

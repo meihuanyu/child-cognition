@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { speakText } from '@/lib/speech';
 import { Button } from '@/components/ui/button';
 
 interface ChineseSegmentProps {
@@ -17,6 +18,15 @@ interface WordSegment {
 export function ChineseSegment({ originalText, pinyinText, isSelected = false }: ChineseSegmentProps) {
   const [segments, setSegments] = useState<WordSegment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const handleSpeak = useCallback((text: string) => {
+    if (!text) {
+      return;
+    }
+
+    speakText(text).catch((error) => {
+      console.error('朗读失败:', error);
+    });
+  }, []);
 
   const handleSegment = useCallback(async () => {
     if (!originalText) {
@@ -115,9 +125,14 @@ export function ChineseSegment({ originalText, pinyinText, isSelected = false }:
 
           // 拼音文字渲染
           return (
-            <span
+            <Button
               key={index}
-              className={`inline-flex flex-col items-center text-center text-base font-semibold text-gray-900 ${marginClass}`}
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => handleSpeak(segment.word)}
+              aria-label={`朗读 ${segment.word}`}
+              className={`h-auto min-h-0 px-1 py-0 inline-flex flex-col items-center text-center text-base font-semibold text-gray-900 ${marginClass}`}
             >
               <ruby className="flex flex-col items-center leading-tight">
                 <rt className="text-xs font-normal text-gray-500 tracking-wide mt-0.5">
@@ -125,7 +140,7 @@ export function ChineseSegment({ originalText, pinyinText, isSelected = false }:
                 </rt>
                 {segment.word}
               </ruby>
-            </span>
+            </Button>
           );
         })}
       </div>

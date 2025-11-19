@@ -66,6 +66,36 @@ export async function uploadToS3(
 }
 
 /**
+ * 直接上传内存中的 Buffer
+ */
+export async function uploadBufferToS3(
+  buffer: Buffer,
+  key: string,
+  contentType: string = 'application/octet-stream'
+): Promise<string> {
+  try {
+    const bucketName = process.env.AWS_BUCKET_NAME;
+    if (!bucketName) {
+      throw new Error('AWS_BUCKET_NAME 环境变量未设置');
+    }
+
+    const s3Client = getS3Client();
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    await s3Client.send(command);
+    return key;
+  } catch (error: any) {
+    console.error('上传 Buffer 到 S3 失败:', error);
+    throw new Error(`上传到 S3 失败: ${error.message}`);
+  }
+}
+
+/**
  * 上传音频文件到 S3
  */
 export async function uploadAudioToS3(

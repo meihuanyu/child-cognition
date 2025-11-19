@@ -107,3 +107,11 @@ export function checkSpeechSupport() {
   };
 }
 
+export {
+  createSherpaRecognizer,
+  preloadSherpaAssets,
+  type SherpaRecognizer,
+  type SherpaRecognizerCallbacks,
+  type SherpaRecognizerOptions,
+} from './sherpa-asr';
+

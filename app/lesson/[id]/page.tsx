@@ -54,6 +54,10 @@ export default function LessonPage() {
     disablePracticeActions,
     isRecorderSupported,
     speechSupport,
+    loadSherpaModel,
+    isRecognizerLoading,
+    isRecognizerReady,
+    liveTranscript,
   } = usePracticeController({
     lesson,
     canPractice,
@@ -120,6 +124,7 @@ export default function LessonPage() {
 
         {currentSegment && (
           <CurrentSegmentCard
+            key={currentSegment.id}
             lesson={lesson}
             currentSegment={currentSegment}
             activeSegmentIndex={activeSegmentIndex}
@@ -130,6 +135,11 @@ export default function LessonPage() {
             isLogsLoading={isCurrentLogsLoading}
             currentLog={currentSegmentLog}
             disablePracticeActions={disablePracticeActions}
+            isRecording={isRecording}
+            onLoadRecognizer={loadSherpaModel}
+            isRecognizerLoading={isRecognizerLoading}
+            isRecognizerReady={isRecognizerReady}
+            liveTranscript={liveTranscript}
             onRefreshLogs={() => fetchSegmentLogs(currentSegment.id)}
             onStartRecording={handleStartRecording}
           />
@@ -165,9 +175,6 @@ export default function LessonPage() {
         onSegmentLesson={handleSegmentLesson}
         onTranslateLesson={handleTranslateLesson}
         onPlayOriginal={handlePlayOriginal}
-        onStartRecording={handleStartRecording}
-        disablePracticeActions={disablePracticeActions}
-        isRecording={isRecording}
         speechSupport={speechSupport}
       />
     </div>

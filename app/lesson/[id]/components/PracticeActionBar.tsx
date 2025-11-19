@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Mic, RefreshCcw, Volume2 } from 'lucide-react';
+import { Loader2, RefreshCcw, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Lesson, Segment } from '../types';
 
@@ -13,9 +13,6 @@ interface PracticeActionBarProps {
   onSegmentLesson: () => void | Promise<void>;
   onTranslateLesson: () => void | Promise<void>;
   onPlayOriginal: () => void | Promise<void>;
-  onStartRecording: () => void | Promise<void>;
-  disablePracticeActions: boolean;
-  isRecording: boolean;
   speechSupport: { synthesis: boolean; recognition: boolean };
 }
 
@@ -28,14 +25,11 @@ export function PracticeActionBar({
   onSegmentLesson,
   onTranslateLesson,
   onPlayOriginal,
-  onStartRecording,
-  disablePracticeActions,
-  isRecording,
   speechSupport,
 }: PracticeActionBarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t bg-white/80 backdrop-blur-sm shadow-lg">
-      <div className="container mx-auto px-4 py-4 flex flex-wrap gap-3 justify-center">
+      <div className="container mx-auto px-4 py-4 flex flex-wrap gap-3 justify-center items-center">
         <Button
           variant="outline"
           onClick={() => {
@@ -97,26 +91,7 @@ export function PracticeActionBar({
           示范
         </Button>
 
-        <Button
-          size="lg"
-          onClick={() => {
-            onStartRecording();
-          }}
-          disabled={disablePracticeActions}
-          className="px-8 py-5 text-lg font-semibold bg-green-600 hover:bg-green-700"
-        >
-          {isRecording ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              正在录音...
-            </>
-          ) : (
-            <>
-              <Mic className="w-5 h-5 mr-2" />
-              开始跟读
-            </>
-          )}
-        </Button>
+        {/* 跟读按钮已迁移至 CurrentSegmentCard */}
       </div>
     </div>
   );

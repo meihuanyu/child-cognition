@@ -1,6 +1,7 @@
 'use client';
 
-import { RefreshCcw } from 'lucide-react';
+import { useMemo } from 'react';
+import { CheckCircle2, Download, Loader2, Mic, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,11 @@ interface CurrentSegmentCardProps {
   isLogsLoading: boolean;
   currentLog: StudyLogEntry | null;
   disablePracticeActions: boolean;
+  isRecording: boolean;
+  onLoadRecognizer: () => void | Promise<void>;
+  isRecognizerLoading: boolean;
+  isRecognizerReady: boolean;
+  liveTranscript: string;
   onRefreshLogs: () => void | Promise<void>;
   onStartRecording: () => void | Promise<void>;
 }
@@ -41,10 +47,21 @@ export function CurrentSegmentCard({
   isLogsLoading,
   currentLog,
   disablePracticeActions,
+  isRecording,
+  onLoadRecognizer,
+  isRecognizerLoading,
+  isRecognizerReady,
+  liveTranscript,
   onRefreshLogs,
   onStartRecording,
 }: CurrentSegmentCardProps) {
-  const currentLogCard = currentLog ? renderLogCard(currentLog, disablePracticeActions, onStartRecording) : null;
+  // 确保当 currentSegment 变化时，log card 也正确更新
+  const currentLogCard = useMemo(() => {
+    if (currentLog) {
+      return renderLogCard(currentLog, disablePracticeActions, onStartRecording);
+    }
+    return null;
+  }, [currentLog, currentSegment.id, disablePracticeActions, onStartRecording]);
 
   return (
     <Card>
@@ -104,6 +121,76 @@ export function CurrentSegmentCard({
           ) : (
             <p className="text-sm text-gray-500">还没有朗读记录，点击下方“开始跟读”开启练习！</p>
           )}
+        </div>
+
+        <div className="rounded-xl border border-dashed border-gray-200 p-4 space-y-3">
+          <p className="text-sm text-gray-600">
+            为了获得更稳定的识别体验，建议先加载 Sherpa 模型，再开始录音。
+          </p>
+          <div className="flex flex-wrap gap-3 items-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                onLoadRecognizer();
+              }}
+              disabled={isRecognizerLoading || isRecognizerReady}
+              className="px-5"
+            >
+              {isRecognizerLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sherpa 模型加载中...
+                </>
+              ) : isRecognizerReady ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                  模型已就绪
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  预加载 Sherpa 模型
+                </>
+              )}
+            </Button>
+            <Button
+              className="px-6 bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                onStartRecording();
+              }}
+              disabled={disablePracticeActions || isRecognizerLoading}
+            >
+              {isRecording ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  正在录音...
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4 mr-2" />
+                  开始跟读
+                </>
+              )}
+            </Button>
+          </div>
+          {!isRecognizerReady && (
+            <p className="text-xs text-gray-500">模型尚未加载时，仍会回落到浏览器语音识别</p>
+          )}
+        </div>
+
+        <div className="rounded-xl bg-gray-100 border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-gray-700">实时识别</p>
+            {isRecording && (
+              <span className="text-xs text-green-600 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                正在聆听
+              </span>
+            )}
+          </div>
+          <p className="text-base text-gray-900 min-h-[2rem] whitespace-pre-wrap break-words">
+            {liveTranscript || (isRecording ? '正在识别...' : '等待本次录音开始')}
+          </p>
         </div>
       </CardContent>
     </Card>

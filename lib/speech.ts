@@ -32,55 +32,6 @@ export function speakText(text: string, lang: 'zh-CN' | 'en-US' = 'zh-CN'): Prom
 }
 
 /**
- * 开始语音识别（ASR）
- * @param lang 语言代码 ('zh-CN' 或 'en-US')
- * @param onResult 识别结果回调
- * @param onError 错误回调
- */
-export function startSpeechRecognition(
-  lang: 'zh-CN' | 'en-US' = 'zh-CN',
-  onResult: (transcript: string) => void,
-  onError?: (error: string) => void
-): SpeechRecognition | null {
-  // 检查浏览器支持
-  const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-  
-  if (!SpeechRecognition) {
-    onError?.('浏览器不支持语音识别');
-    return null;
-  }
-
-  const recognition = new SpeechRecognition();
-  recognition.lang = lang;
-  recognition.interimResults = false; // 只返回最终结果
-  recognition.maxAlternatives = 1;
-  recognition.continuous = false; // 单次识别
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    onResult(transcript);
-  };
-
-  recognition.onerror = (event) => {
-    console.error('语音识别错误:', event.error);
-    onError?.(event.error);
-  };
-
-  recognition.onend = () => {
-    console.log('语音识别结束');
-  };
-
-  try {
-    recognition.start();
-    return recognition;
-  } catch (error) {
-    console.error('启动语音识别失败:', error);
-    onError?.('启动语音识别失败');
-    return null;
-  }
-}
-
-/**
  * 停止语音识别
  */
 export function stopSpeechRecognition(recognition: SpeechRecognition | null) {

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { evaluateTranscript } from '@/lib/evaluate';
 import {
-  startSpeechRecognition,
   checkSpeechSupport,
   createSherpaRecognizer,
   preloadSherpaAssets,
@@ -232,10 +231,7 @@ export function usePracticeController({
 
   const handleStartRecording = useCallback(async () => {
     if (!lesson || !currentSegment) return;
-
-    const isEnglishLesson = lesson.language === 'en';
     const targetText = currentSegment.originalText?.trim();
-    const recognitionLang: 'zh-CN' | 'en-US' = isEnglishLesson ? 'en-US' : 'zh-CN';
 
     if (!targetText) {
       alert('该句子暂不可用，请选择其他句子继续练习。');
@@ -264,36 +260,12 @@ export function usePracticeController({
     } catch (error) {
       console.warn('Sherpa 启动失败，尝试使用 Web Speech API', error);
     }
-
-    const recognition = startSpeechRecognition(
-      recognitionLang,
-      async (transcript) => {
-        setLiveTranscript(transcript);
-        await handleTranscriptResult(transcript);
-      },
-      (error) => {
-        console.error('录音失败:', error);
-        pendingSegmentRef.current = null;
-        cancelRecording();
-        setIsRecording(false);
-        setPracticeError('录音失败，请检查麦克风权限');
-      }
-    );
-
-    if (!recognition) {
-      cancelRecording();
-      setIsRecording(false);
-      pendingSegmentRef.current = null;
-      setPracticeError('浏览器暂不支持语音识别，请更换或更新浏览器');
-      return;
-    }
   }, [
     lesson,
     currentSegment,
     setActiveSegmentIndex,
     startAudioRecording,
     isRecorderSupported,
-    startSpeechRecognition,
     stopAudioRecording,
     updateSegmentLog,
     cancelRecording,

@@ -9,6 +9,7 @@ export interface AudioFileRecognitionResult {
   text: string;
   duration: number;
   segments: SubtitleSegment[];
+  audioUrl?: string;
 }
 
 /**
@@ -58,6 +59,7 @@ export async function recognizeAudioFile(
     const decoder = new TextDecoder();
     const segments: SubtitleSegment[] = [];
     let currentText = '';
+    let audioUrl = '';
     let progress = 10;
     
     while (true) {
@@ -94,8 +96,14 @@ export async function recognizeAudioFile(
                 endTime: data.endTime
               });
               currentText += data.text;
-              progress = Math.min(progress + 5, 95);
+              progress = Math.min(progress + 5, 90);
               onProgress?.(progress, `已识别 ${segments.length} 个片段`);
+              break;
+              
+            case 'audioUrl':
+              // 接收音频 URL
+              audioUrl = data.url;
+              onProgress?.(95, '音频上传完成');
               break;
               
             case 'done':
@@ -122,7 +130,8 @@ export async function recognizeAudioFile(
     return {
       text: currentText || '未识别到文本',
       duration: processDuration,
-      segments
+      segments,
+      audioUrl: audioUrl || undefined
     };
     
   } catch (error) {

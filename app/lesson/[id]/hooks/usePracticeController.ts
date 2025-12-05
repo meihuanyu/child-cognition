@@ -80,7 +80,6 @@ export function usePracticeController({
         if (isRecordingRef.current) {
           setIsRecording(false);
           cancelRecording();
-          sherpaRecognizerRef.current?.stop();
           pendingSegmentRef.current = null;
         }
       }
@@ -105,7 +104,7 @@ export function usePracticeController({
   }, [lesson, currentSegment, proxiedAudioUrl, audioRef]);
 
   const handleTranscriptResult = useCallback(
-    async (transcript: string) => {
+    async (transcript: string, audioResult: RecorderStopResult | null) => {
       const pending = pendingSegmentRef.current;
       if (!pending) {
         return;
@@ -116,12 +115,6 @@ export function usePracticeController({
 
       try {
         const rating = evaluateTranscript(targetText, transcript);
-        let audioResult: RecorderStopResult | null = null;
-        try {
-          audioResult = await stopAudioRecording();
-        } catch (err) {
-          console.error('停止录音失败:', err);
-        }
 
         const formData = new FormData();
         formData.append('userId', DEMO_USER_ID);
@@ -163,11 +156,10 @@ export function usePracticeController({
         console.error('保存朗读记录失败:', err);
         setPracticeError(err?.message || '保存朗读记录失败，请稍后重试');
       } finally {
-        sherpaRecognizerRef.current?.stop();
         setIsRecording(false);
       }
     },
-    [lesson, setActiveSegmentIndex, stopAudioRecording, updateSegmentLog]
+    [lesson, setActiveSegmentIndex, updateSegmentLog]
   );
 
   const handleSherpaError = useCallback(
@@ -175,7 +167,6 @@ export function usePracticeController({
       console.error('Sherpa 识别失败:', error);
       pendingSegmentRef.current = null;
       cancelRecording();
-      sherpaRecognizerRef.current?.stop();
       setIsRecording(false);
       setPracticeError(error?.message || 'Sherpa 语音识别失败，请稍后重试');
       setLiveTranscript('');
@@ -183,7 +174,19 @@ export function usePracticeController({
     [cancelRecording]
   );
 
-  handleTranscriptResultRef.current = handleTranscriptResult;
+  const convertBlobToAudioData = useCallback(async (blob: Blob): Promise<{ audioData: Float32Array; sampleRate: number }> => {
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    audioContext.close();
+    return { audioData, sampleRate };
+  }, []);
+
+  handleTranscriptResultRef.current = async (transcript: string) => {
+    await handleTranscriptResult(transcript, null);
+  };
   handleSherpaErrorRef.current = handleSherpaError;
 
   const getSherpaRecognizer = useCallback(() => {
@@ -191,11 +194,10 @@ export function usePracticeController({
       sherpaRecognizerRef.current = createSherpaRecognizer(
         {},
         {
-          onFinal: (text) => {
-            setLiveTranscript(text);
-            handleTranscriptResultRef.current(text);
-          },
           onPartial: (text) => {
+            setLiveTranscript(text);
+          },
+          onFinal: (text) => {
             setLiveTranscript(text);
           },
           onError: (error) => {
@@ -229,8 +231,38 @@ export function usePracticeController({
 
   const handleStartRecording = useCallback(async () => {
     if (!lesson || !currentSegment) return;
-    const targetText = currentSegment.originalText?.trim();
 
+    // 如果正在录音，则停止并识别
+    if (isRecording) {
+      setLiveTranscript('正在识别...');
+      try {
+        const audioResult = await stopAudioRecording();
+        
+        if (!audioResult?.blob) {
+          throw new Error('录音数据为空');
+        }
+
+        // 转换音频数据
+        const { audioData, sampleRate } = await convertBlobToAudioData(audioResult.blob);
+        
+        // 使用 Sherpa 识别
+        const sherpa = getSherpaRecognizer();
+        const transcript = await sherpa.recognize(audioData, sampleRate);
+        
+        if (!transcript) {
+          throw new Error('未识别到语音内容');
+        }
+
+        await handleTranscriptResult(transcript, audioResult);
+      } catch (error) {
+        console.error('识别失败:', error);
+        handleSherpaError(error instanceof Error ? error : new Error(String(error)));
+      }
+      return;
+    }
+
+    // 开始录音
+    const targetText = currentSegment.originalText?.trim();
     if (!targetText) {
       alert('该句子暂不可用，请选择其他句子继续练习。');
       return;
@@ -248,27 +280,17 @@ export function usePracticeController({
       pendingSegmentRef.current = null;
       return;
     }
-
-    try {
-      const sherpa = getSherpaRecognizer();
-      const started = await sherpa.start();
-      if (started) {
-        return;
-      }
-    } catch (error) {
-      console.warn('Sherpa 启动失败，尝试使用 Web Speech API', error);
-    }
   }, [
     lesson,
     currentSegment,
-    setActiveSegmentIndex,
+    isRecording,
     startAudioRecording,
-    isRecorderSupported,
     stopAudioRecording,
-    updateSegmentLog,
-    cancelRecording,
+    isRecorderSupported,
     getSherpaRecognizer,
     handleTranscriptResult,
+    handleSherpaError,
+    convertBlobToAudioData,
   ]);
 
   const disablePracticeActions = isRecording || !canPractice;

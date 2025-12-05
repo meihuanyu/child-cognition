@@ -88,7 +88,12 @@ export async function uploadBufferToS3(
     });
 
     await s3Client.send(command);
-    return key;
+    
+    // 返回完整的 OSS URL
+    const region = process.env.AWS_REGION || 'oss-cn-shanghai';
+    const publicUrl = `https://${bucketName}.${region}.aliyuncs.com/${key}`;
+    
+    return publicUrl;
   } catch (error: any) {
     console.error('上传 Buffer 到 S3 失败:', error);
     throw new Error(`上传到 S3 失败: ${error.message}`);

@@ -19,13 +19,6 @@ export default function CreateLessonPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [serviceStatus, setServiceStatus] = useState<{
-    configured: boolean;
-    message?: string;
-    checked: boolean;
-    azure?: { configured: boolean; region?: string };
-    audioConverter?: { type: string; description: string };
-  }>({ configured: false, checked: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -33,34 +26,6 @@ export default function CreateLessonPage() {
 
   // MVP: 使用固定的用户 ID（生产环境应使用 NextAuth）
   const DEMO_USER_ID = 'demo-user-001';
-
-  // 检查服务状态
-  const checkServiceStatus = useCallback(async () => {
-    if (serviceStatus.checked) return;
-    
-    try {
-      const response = await fetch('/api/audio/status');
-      const data = await response.json();
-      setServiceStatus({
-        configured: data.configured,
-        message: data.message,
-        checked: true,
-        azure: data.azure,
-        audioConverter: data.audioConverter
-      });
-      
-      if (!data.configured) {
-        setError(data.message || '服务未就绪');
-      }
-    } catch (err) {
-      console.error('检查服务状态失败:', err);
-      setServiceStatus({
-        configured: false,
-        message: '无法连接到服务器',
-        checked: true
-      });
-    }
-  }, [serviceStatus.checked]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +129,7 @@ export default function CreateLessonPage() {
         body: JSON.stringify({
           text: result.text,
           segments: result.segments, // 包含时间戳的片段
+          audioUrl: result.audioUrl, // OSS 音频 URL
           userId: DEMO_USER_ID,
           sourceType: 'audio',
           fileName: selectedFile.name,
@@ -295,40 +261,8 @@ export default function CreateLessonPage() {
                 </form>
               </TabsContent>
 
-              <TabsContent value="audio" className="space-y-6" onClick={checkServiceStatus}>
+              <TabsContent value="audio" className="space-y-6">
                 <div className="space-y-6">
-                  {/* 服务状态提示 */}
-                  {serviceStatus.checked && !serviceStatus.configured && (
-                    <Alert variant="destructive">
-                      <AlertDescription>
-                        <div className="space-y-2">
-                          <div className="font-semibold">{serviceStatus.message}</div>
-                          <div className="text-xs mt-2">
-                            请参考 <code className="bg-red-100 px-1 rounded">AZURE_SPEECH_SETUP.md</code> 和{' '}
-                            <code className="bg-red-100 px-1 rounded">README_AUDIO.md</code> 文档进行配置
-                          </div>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  {serviceStatus.checked && serviceStatus.configured && (
-                    <Alert className="bg-green-50 border-green-200">
-                      <AlertDescription>
-                        <div className="text-green-800 space-y-1">
-                          <div className="font-semibold">✅ Azure Speech Service 已就绪</div>
-                          <div className="text-xs space-y-1">
-                            {serviceStatus.azure?.configured && (
-                              <div>📍 区域: {serviceStatus.azure.region}</div>
-                            )}
-                            {serviceStatus.audioConverter && (
-                              <div>🎵 音频转换: {serviceStatus.audioConverter.type}</div>
-                            )}
-                          </div>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
                   <div className="space-y-2">
                     <Label htmlFor="audioFile" className="text-base">
                       选择音频文件

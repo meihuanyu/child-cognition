@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // 模式 2：从文本创建（音频识别）
     if (text) {
-      const { segments } = body;
+      const { segments, audioUrl } = body;
       
       const title = fileName 
         ? fileName.replace(/\.[^/.]+$/, '') // 去除扩展名
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
           userId,
           sourceUrl: sourceType === 'audio' ? `audio://${fileName || 'uploaded'}` : 'text://direct',
           title,
+          audioUrl: audioUrl || null, // 保存 OSS 音频 URL
           status: 'PENDING',
         },
       });

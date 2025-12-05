@@ -154,16 +154,16 @@ export function CurrentSegmentCard({
               )}
             </Button>
             <Button
-              className="px-6 bg-green-600 hover:bg-green-700"
+              className={isRecording ? "px-6 bg-red-600 hover:bg-red-700" : "px-6 bg-green-600 hover:bg-green-700"}
               onClick={() => {
                 onStartRecording();
               }}
-              disabled={disablePracticeActions || isRecognizerLoading}
+              disabled={isRecognizerLoading || (!isRecording && disablePracticeActions)}
             >
               {isRecording ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  正在录音...
+                  停止并识别
                 </>
               ) : (
                 <>

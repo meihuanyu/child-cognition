@@ -10,15 +10,12 @@ export interface SherpaRecognizerCallbacks {
 export interface SherpaRecognizerOptions {
   assetsBaseUrl?: string;
   sampleRate?: number;
-  bufferSize?: number;
   recognizerConfig?: Record<string, unknown>;
 }
 
 export interface SherpaRecognizer {
-  start: () => Promise<boolean>;
-  stop: () => void;
+  recognize: (audioData: Float32Array, sampleRate: number) => Promise<string>;
   dispose: () => void;
-  isRecording: () => boolean;
   getStatus: () => SherpaStatus;
 }
 
@@ -51,7 +48,6 @@ interface LoadSherpaModuleOptions {
 
 const DEFAULT_BASE_URL = '/sherpa';
 const DEFAULT_SAMPLE_RATE = 16000;
-const DEFAULT_BUFFER_SIZE = 4096;
 type WindowWithSherpa = Window & {
   createOnlineRecognizer?: (Module: any, config?: Record<string, unknown>) => SherpaOnlineRecognizer;
   __childCognitionSherpaModulePromise?: Promise<any>;
@@ -80,17 +76,10 @@ export function createSherpaRecognizer(
 
   const browserWindow = window as WindowWithSherpa;
   const normalizedBase = normalizeBaseUrl(options.assetsBaseUrl ?? DEFAULT_BASE_URL);
-  const sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
-  const bufferSize = options.bufferSize ?? DEFAULT_BUFFER_SIZE;
+  const targetSampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
 
   let status: SherpaStatus = 'idle';
-  let audioContext: AudioContext | null = null;
-  let mediaStream: MediaStream | null = null;
-  let mediaSource: MediaStreamAudioSourceNode | null = null;
-  let processor: ScriptProcessorNode | null = null;
   let recognizer: SherpaOnlineRecognizer | null = null;
-  let recognizerStream: SherpaOnlineStream | null = null;
-  let lastPartial = '';
   let preparePromise: Promise<void> | null = null;
   let disposed = false;
 
@@ -101,9 +90,6 @@ export function createSherpaRecognizer(
 
   const ensureRecognizer = async () => {
     if (recognizer) {
-      if (!recognizerStream) {
-        recognizerStream = recognizer.createStream();
-      }
       return;
     }
 
@@ -122,7 +108,6 @@ export function createSherpaRecognizer(
             throw new Error('未找到 createOnlineRecognizer，确认 sherpa 脚本是否成功加载');
           }
           recognizer = factory(Module, options.recognizerConfig);
-          recognizerStream = recognizer.createStream();
           notifyStatus('ready', 'Sherpa ONNX 初始化完成');
         })
         .catch((error: Error) => {
@@ -135,167 +120,82 @@ export function createSherpaRecognizer(
     await preparePromise;
   };
 
-  const handleAudioProcess = (event: AudioProcessingEvent) => {
-    if (!recognizer || !recognizerStream) {
-      return;
-    }
-
-    try {
-      const inputBuffer = event.inputBuffer.getChannelData(0);
-      const copiedSamples = new Float32Array(inputBuffer.length);
-      copiedSamples.set(inputBuffer);
-      const processedSamples = downsampleBuffer(
-        copiedSamples,
-        event.inputBuffer.sampleRate,
-        sampleRate
-      );
-
-      recognizerStream.acceptWaveform(sampleRate, processedSamples);
-
-      while (recognizer.isReady(recognizerStream)) {
-        recognizer.decode(recognizerStream);
-      }
-
-      let result = recognizer.getResult(recognizerStream)?.text ?? '';
-
-      if (hasParaformerModel(recognizer)) {
-        const tailPaddings = new Float32Array(sampleRate);
-        recognizerStream.acceptWaveform(sampleRate, tailPaddings);
-        while (recognizer.isReady(recognizerStream)) {
-          recognizer.decode(recognizerStream);
-        }
-        result = recognizer.getResult(recognizerStream)?.text ?? result;
-      }
-
-      if (result && result !== lastPartial) {
-        lastPartial = result;
-        callbacks.onPartial?.(result);
-      }
-
-      if (recognizer.isEndpoint(recognizerStream)) {
-        flushFinalResult();
-        recognizer.reset(recognizerStream);
-      }
-    } catch (error) {
-      console.error('Sherpa ASR 处理音频数据失败', error);
-      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
-    }
-  };
-
-  const flushFinalResult = () => {
-    if (!recognizer || !recognizerStream) {
-      return;
-    }
-    const result = recognizer.getResult(recognizerStream)?.text ?? '';
-    const finalText = result || lastPartial;
-
-    if (finalText) {
-      callbacks.onFinal?.(finalText);
-    }
-
-    lastPartial = '';
-  };
-
-  const start = async () => {
+  const recognize = async (audioData: Float32Array, sampleRate: number): Promise<string> => {
     if (disposed) {
-      throw new Error('Sherpa ASR 已销毁，无法重新启动');
-    }
-
-    if (status === 'recording') {
-      return true;
+      throw new Error('Sherpa ASR 已销毁，无法识别');
     }
 
     try {
       await ensureRecognizer();
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('当前浏览器不支持麦克风录制');
+      
+      if (!recognizer) {
+        throw new Error('识别器未初始化');
       }
 
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioContext = new AudioContext({ sampleRate });
-      mediaSource = audioContext.createMediaStreamSource(mediaStream);
-
-      const numberOfInputChannels = 1;
-      const numberOfOutputChannels = 1;
-      if (audioContext.createScriptProcessor) {
-        processor = audioContext.createScriptProcessor(
-          bufferSize,
-          numberOfInputChannels,
-          numberOfOutputChannels
-        );
-      } else {
-        processor = (audioContext as any).createJavaScriptNode?.(
-          bufferSize,
-          numberOfInputChannels,
-          numberOfOutputChannels
-        );
+      const stream = recognizer.createStream();
+      
+      // 重采样到目标采样率
+      const processedSamples = downsampleBuffer(audioData, sampleRate, targetSampleRate);
+      
+      // 分批送入音频数据
+      const chunkSize = 1600; // 100ms at 16kHz
+      for (let i = 0; i < processedSamples.length; i += chunkSize) {
+        const chunk = processedSamples.slice(i, Math.min(i + chunkSize, processedSamples.length));
+        stream.acceptWaveform(targetSampleRate, chunk);
+        
+        while (recognizer.isReady(stream)) {
+          recognizer.decode(stream);
+        }
+        
+        const partial = recognizer.getResult(stream)?.text ?? '';
+        if (partial) {
+          callbacks.onPartial?.(partial);
+        }
       }
 
-      if (!processor) {
-        throw new Error('创建 ScriptProcessor 失败，浏览器可能不支持');
+      // Paraformer 模型需要尾部填充
+      if (hasParaformerModel(recognizer)) {
+        const tailPaddings = new Float32Array(targetSampleRate);
+        stream.acceptWaveform(targetSampleRate, tailPaddings);
+        while (recognizer.isReady(stream)) {
+          recognizer.decode(stream);
+        }
       }
 
-      processor.onaudioprocess = handleAudioProcess;
-      mediaSource.connect(processor);
-      processor.connect(audioContext.destination);
+      stream.inputFinished();
+      
+      while (recognizer.isReady(stream)) {
+        recognizer.decode(stream);
+      }
 
-      notifyStatus('recording');
-      return true;
+      const finalResult = recognizer.getResult(stream)?.text ?? '';
+      
+      if (finalResult) {
+        callbacks.onFinal?.(finalResult);
+      }
+
+      return finalResult;
     } catch (error) {
-      notifyStatus('error', error instanceof Error ? error.message : String(error));
-      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
-      cleanupMedia();
-      return false;
+      const err = error instanceof Error ? error : new Error(String(error));
+      notifyStatus('error', err.message);
+      callbacks.onError?.(err);
+      throw err;
     }
-  };
-
-  const stop = () => {
-    if (status !== 'recording') {
-      return;
-    }
-
-    if (recognizerStream) {
-      recognizerStream.inputFinished();
-      flushFinalResult();
-      recognizer?.reset(recognizerStream);
-    }
-
-    cleanupMedia();
-    notifyStatus('ready');
   };
 
   const dispose = () => {
     if (disposed) {
       return;
     }
-    stop();
     recognizer?.free();
     recognizer = null;
-    recognizerStream = null;
     disposed = true;
     notifyStatus('idle');
   };
 
-  const cleanupMedia = () => {
-    processor?.disconnect();
-    mediaSource?.disconnect();
-    processor = null;
-    mediaSource = null;
-
-    mediaStream?.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-
-    if (audioContext && audioContext.state !== 'closed') {
-      audioContext.close().catch(() => undefined);
-    }
-    audioContext = null;
-  };
-
   return {
-    start,
-    stop,
+    recognize,
     dispose,
-    isRecording: () => status === 'recording',
     getStatus: () => status,
   };
 }

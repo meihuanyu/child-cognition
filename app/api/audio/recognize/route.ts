@@ -3,6 +3,7 @@ import { writeFile, unlink, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { convertToWav } from '@/lib/wav-utils';
+import { uploadBufferToS3 } from '@/lib/s3';
 
 /**
  * POST /api/audio/recognize
@@ -60,6 +61,14 @@ export async function POST(request: NextRequest) {
         // 3. 流式识别
         await recognizeStream(wavFilePath, send);
 
+        // 4. 上传音频到 OSS
+        send({ type: 'status', message: '上传音频到云存储...' });
+        
+        const timestamp = Date.now();
+        const ossKey = `audio/${timestamp}-${file.name}`;
+        const audioUrl = await uploadBufferToS3(buffer, ossKey, file.type || 'audio/mpeg');
+        
+        send({ type: 'audioUrl', url: audioUrl });
         send({ type: 'done' });
         controller.close();
 

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { evaluateTranscript } from '@/lib/evaluate';
 import {
-  checkSpeechSupport,
   createSherpaRecognizer,
   preloadSherpaAssets,
   type SherpaRecognizer,
@@ -38,7 +37,6 @@ export function usePracticeController({
   const [isRecognizerReady, setIsRecognizerReady] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
 
-  const speechSupport = useMemo(() => checkSpeechSupport(), []);
   const sherpaRecognizerRef = useRef<SherpaRecognizer | null>(null);
   const pendingSegmentRef = useRef<{ segment: Segment; targetText: string } | null>(null);
   const handleTranscriptResultRef = useRef<(transcript: string) => Promise<void>>(async () => undefined);
@@ -293,7 +291,6 @@ export function usePracticeController({
     handlePlayOriginal,
     disablePracticeActions,
     isRecorderSupported,
-    speechSupport,
     loadSherpaModel,
     isRecognizerLoading,
     isRecognizerReady,

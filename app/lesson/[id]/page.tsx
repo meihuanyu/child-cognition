@@ -53,7 +53,6 @@ export default function LessonPage() {
     handlePlayOriginal,
     disablePracticeActions,
     isRecorderSupported,
-    speechSupport,
     loadSherpaModel,
     isRecognizerLoading,
     isRecognizerReady,
@@ -175,7 +174,6 @@ export default function LessonPage() {
         onSegmentLesson={handleSegmentLesson}
         onTranslateLesson={handleTranslateLesson}
         onPlayOriginal={handlePlayOriginal}
-        speechSupport={speechSupport}
       />
     </div>
   );

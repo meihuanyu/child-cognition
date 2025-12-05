@@ -44,20 +44,6 @@ export function stopSpeechRecognition(recognition: SpeechRecognition | null) {
   }
 }
 
-/**
- * 检查浏览器是否支持 Web Speech API
- */
-export function checkSpeechSupport() {
-  const hasSpeechSynthesis = 'speechSynthesis' in window;
-  const hasSpeechRecognition = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
-
-  return {
-    synthesis: hasSpeechSynthesis,
-    recognition: hasSpeechRecognition,
-    fullSupport: hasSpeechSynthesis && hasSpeechRecognition,
-  };
-}
-
 export {
   createSherpaRecognizer,
   preloadSherpaAssets,

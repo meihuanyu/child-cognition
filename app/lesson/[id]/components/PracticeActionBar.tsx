@@ -13,7 +13,6 @@ interface PracticeActionBarProps {
   onSegmentLesson: () => void | Promise<void>;
   onTranslateLesson: () => void | Promise<void>;
   onPlayOriginal: () => void | Promise<void>;
-  speechSupport: { synthesis: boolean; recognition: boolean };
 }
 
 export function PracticeActionBar({
@@ -25,7 +24,6 @@ export function PracticeActionBar({
   onSegmentLesson,
   onTranslateLesson,
   onPlayOriginal,
-  speechSupport,
 }: PracticeActionBarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t bg-white/80 backdrop-blur-sm shadow-lg">
@@ -84,7 +82,7 @@ export function PracticeActionBar({
           onClick={() => {
             onPlayOriginal();
           }}
-          disabled={!speechSupport.synthesis || !currentSegment}
+          disabled={!currentSegment}
           className="px-8 py-5 text-lg font-semibold"
         >
           <Volume2 className="w-5 h-5 mr-2" />

@@ -27,6 +27,8 @@ export async function POST(
 
   try {
     const { lessonId } = params;
+    const body = await request.json().catch(() => ({}));
+    const { text } = body;
 
     // 获取课程信息
     const lesson = await prisma.lesson.findUnique({
@@ -47,28 +49,61 @@ export async function POST(
     });
 
     try {
-      // 一次性下载音频、字幕和元数据
-      console.log('正在下载 YouTube 内容（音频、字幕、元数据）...');
       let fullAudioUrl: string | null = null;
       let subtitleSegments: SubtitleSegment[] = [];
-      let videoTitle = '处理中...';
+      let videoTitle = lesson.title || '处理中...';
       let language = 'zh'; // 默认中文
 
-      // 创建临时文件路径
-      tempAudioPath = path.join(projectTempDir, `audio-${lessonId}-${Date.now()}.mp3`);
+      // 模式 1: 从文本直接创建（音频识别）
+      if (text) {
+        console.log('从提供的文本创建课程...');
+        
+        // 检查是否有segments数据（包含时间戳）
+        const bodySegments = body.segments;
+        
+        if (bodySegments && Array.isArray(bodySegments) && bodySegments.length > 0) {
+          // 使用从 Sherpa 获取的带时间戳的片段
+          subtitleSegments = bodySegments;
+          console.log(`使用带时间戳的 ${subtitleSegments.length} 条片段`);
+        } else {
+          // 备用方案：将文本转换为字幕片段格式
+          // 简单处理：按句子分割
+          const sentences = text.split(/[。！？\n]+/).filter((s: string) => s.trim().length > 0);
+          let currentTime = 0;
+          const avgDuration = 3; // 假设每句话3秒
 
-      // 一次性下载所有内容（包含语言和时间戳）
-      const content = await downloadYouTubeContent(lesson.sourceUrl, tempAudioPath);
-      console.log('下载完成:', content.title);
-      console.log('检测到语言:', content.language);
+          subtitleSegments = sentences.map((sentence: string, index: number) => ({
+            text: sentence.trim(),
+            startTime: currentTime + index * avgDuration,
+            endTime: currentTime + (index + 1) * avgDuration,
+          }));
 
-      videoTitle = content.title;
-      subtitleSegments = content.subtitles;
-      language = content.language;
+          console.log(`从文本生成了 ${subtitleSegments.length} 条片段`);
+        }
+      } else {
+        // 模式 2: 从 YouTube 下载
+        console.log('正在下载 YouTube 内容（音频、字幕、元数据）...');
 
-      // 上传音频到 S3
-      fullAudioUrl = await uploadAudioToS3(content.audioPath, lessonId);
-      console.log('音频上传成功:', fullAudioUrl);
+        // 创建临时文件路径
+        tempAudioPath = path.join(projectTempDir, `audio-${lessonId}-${Date.now()}.mp3`);
+
+        // 一次性下载所有内容（包含语言和时间戳）
+        const content = await downloadYouTubeContent(lesson.sourceUrl, tempAudioPath);
+        console.log('下载完成:', content.title);
+        console.log('检测到语言:', content.language);
+
+        videoTitle = content.title;
+        subtitleSegments = content.subtitles;
+        language = content.language;
+
+        // 上传音频到 S3
+        fullAudioUrl = await uploadAudioToS3(content.audioPath, lessonId);
+        console.log('音频上传成功:', fullAudioUrl);
+
+        // 清理临时文件
+        cleanupTempFile(content.audioPath);
+        tempAudioPath = null;
+      }
 
       // 更新课程标题、语言和音频 URL
       await prisma.lesson.update({
@@ -79,10 +114,6 @@ export async function POST(
           audioUrl: fullAudioUrl,
         },
       });
-
-      // 清理临时文件
-      cleanupTempFile(content.audioPath);
-      tempAudioPath = null;
 
       console.log(`获取到 ${subtitleSegments.length} 条字幕片段`);
 
